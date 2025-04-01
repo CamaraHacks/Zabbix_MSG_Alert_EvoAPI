@@ -43,10 +43,10 @@ def api_get_alerts(ZABBIX_API_URL, UNAME, PWORD, hostpf):
             ],
         "filter": {"value": 1}, 
         "type": 1,
-        "lastChangeSince": reload_triggered,
+        #"lastChangeSince": reload_triggered,
         #"lastChangeTill": now, 
         "selectHosts": ["host"],
-        "selectAcknowledges": ["acknowledgeid", "userid"],  
+        #"selectAcknowledges": ["acknowledgeid", "userid"],  
         "sortfield": "priority",  # Corrige ordenação
         "sortorder": "DESC"  # Ordena da maior para menor severidade
     },
@@ -55,7 +55,7 @@ def api_get_alerts(ZABBIX_API_URL, UNAME, PWORD, hostpf):
 })
 
     # Salvando os dados retornados em um arquivo JSON
-    with open('triggers.json', 'w', encoding='utf-8') as f:
+    with open('check_files/triggers.json', 'w', encoding='utf-8') as f:
         json.dump(req.json(), f, indent=4)
 
     # Logout user

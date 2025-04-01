@@ -15,11 +15,6 @@ def get_credentials():
     return ZABBIX_API_URL, UNAME, PWORD, hostpf, url, phone_number, api_key 
 
 
-    
-
-#formatação
-
-listignore = ["rumoall-stsp-hafw-1", "CS_RUPOR_ACP_01", "rumoall-gja-hafw-1"]
 def alerta(host_name, description, triggerid):
     if host_name and description and triggerid:
         return f"O host: {host_name} está com um alerta ativo ⚠️\nDescrição do Alerta: {description}\nNível de Severidade: Alta, serviço fora do ar\nTrigger ID: {triggerid}"
@@ -27,24 +22,21 @@ def alerta(host_name, description, triggerid):
         return "Erro: Dados do alerta não estão completos."
 
 def get_hosts():
-    with open('/home/user0/Documentos/Zabbix_Trigger_Alert/NOC_FIPS_engine/triggers.json', 'r') as f:
+    
+    with open('/home/user0/Documentos/Zabbix_Trigger_Alert/NOC_FIPS_engine/check_files/triggers.json', 'r') as f:
         data = json.load(f)
+    ignored_items = ['rumoall-gja-hafw-1', 'rumoall-stsp-hafw-1', 'CS_RUPOR_ACP_01']  
     hosts = []  # Lista para armazenar hosts com prioridade '4'
-    for host in listignore:
-        listignore.remove(host)
     for host in data['result']:
-        if host in listignore:
-            data['result'].remove(host)
-        elif host.get('priority') == '4':
-            description = host.get('description')
-            host_name = host.get('hosts')[0].get('host') if host.get('hosts') else "Host não encontrado"
-            triggerid = host.get('triggerid')
-            hosts.append((host_name, description, triggerid))  # Adiciona o host à lista
+        if host.get('priority') == 4:
+            host_name = host.get('hosts')[0] if host.get('hosts') else "Host não encontrado"
+            if host_name not in ignored_items:
+                description = host.get('description')
+                triggerid = host.get('triggerid')
+                hosts.append((host_name, description, triggerid))
+            
             
     return hosts
-
-
-
 
 
 

@@ -1,2 +1,0 @@
-# Zabbix_MSG_Alert_EvoAPI
-Zabbix_MSG_Alert_EvoAPI
