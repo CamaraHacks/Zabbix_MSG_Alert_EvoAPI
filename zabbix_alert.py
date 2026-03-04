@@ -1,78 +1,93 @@
 import requests
 import json
-import time
-from datetime import datetime
+import logging
+from config import HOST_IDS
 
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def api_get_alerts(ZABBIX_API_URL, UNAME, PWORD, hostpf):
-    now = int(time.time())
-    reload_triggered = int(time.time()) - 600
-   
-    req = requests.post(ZABBIX_API_URL, json={
+def api_get_alerts(zabbix_api_url, username, password):
+    """
+    Authenticates with Zabbix API, fetches triggers, and returns the result.
+    """
+    session = requests.Session()
+    headers = {'Content-Type': 'application/json-rpc'}
+    
+    # 1. Login
+    login_payload = {
         "jsonrpc": "2.0",
         "method": "user.login",
         "params": {
-            "username": UNAME,
-            "password": PWORD,
+            "username": username,
+            "password": password,
         },
         "id": 1
-    })
+    }
     
-    # Verificando se o login foi bem-sucedido
-    response = req.json()
-    if "result" in response:
-        AUTHTOKEN = response["result"]
-        print("Login bem-sucedido!")
-    else:
-        print("Erro ao logar:", response)
-        return  # Sai da função em caso de erro
+    try:
+        response = session.post(zabbix_api_url, json=login_payload, headers=headers)
+        response.raise_for_status()
+        login_data = response.json()
+    except requests.RequestException as e:
+        logging.error(f"Error connecting to Zabbix API: {e}")
+        return []
 
-    # Buscando os triggers
-    print("Efetuando a busca...")
-    req = requests.post(ZABBIX_API_URL, json={
+    if "result" not in login_data:
+        logging.error(f"Login failed: {login_data.get('error')}")
+        return []
+    
+    auth_token = login_data["result"]
+    logging.info("Login successful!")
+
+    # 2. Get Triggers
+    logging.info("Fetching triggers...")
+    trigger_payload = {
         "jsonrpc": "2.0",
         "method": "trigger.get",
         "params": {
-            "output": ["status", "hostid", "priority", "description"],
-             "hostids": [
-                11658, 11664, 12060, 12064, 12065, 12066, 12409, 12410, 12411, 12412, 12413, 
-                12414, 12415, 12416, 12420, 12421, 12422, 12423, 12424, 12425, 
-                12426, 12427, 12430, 12431, 12432, 12862, 12942, 13248, 13249, 13307, 13308, 
-                13309, 13343, 13778, 13779, 13780, 13781, 13782, 13783, 13784, 13785, 13786, 
-                13787, 13788, 13789, 13790, 13791, 13792, 13797,13798,13799,13800,13801,13802,13803
-            ],
-        "filter": {"value": 1}, 
-        "type": 1,
-        #"lastChangeSince": reload_triggered,
-        #"lastChangeTill": now, 
-        "selectHosts": ["host"],
-        #"selectAcknowledges": ["acknowledgeid", "userid"],  
-        "sortfield": "priority",  # Corrige ordenação
-        "sortorder": "DESC"  # Ordena da maior para menor severidade
-    },
-    "id": 2,
-    "auth": AUTHTOKEN
-})
+            "output": ["status", "hostid", "priority", "description", "triggerid"],
+            "hostids": HOST_IDS,
+            "filter": {"value": 1}, 
+            "type": 1,
+            "selectHosts": ["host"],
+            "sortfield": "priority",
+            "sortorder": "DESC"
+        },
+        "id": 2,
+        "auth": auth_token
+    }
 
-    # Salvando os dados retornados em um arquivo JSON
-    with open('check_files/triggers.json', 'w', encoding='utf-8') as f:
-        json.dump(req.json(), f, indent=4)
+    triggers = []
+    try:
+        response = session.post(zabbix_api_url, json=trigger_payload, headers=headers)
+        response.raise_for_status()
+        trigger_data = response.json()
+        
+        if "result" in trigger_data:
+            triggers = trigger_data["result"]
+        else:
+            logging.error(f"Error fetching triggers: {trigger_data.get('error')}")
 
-    # Logout user
-    print("Logout user")
-    req = requests.post(ZABBIX_API_URL, json={
+    except requests.RequestException as e:
+        logging.error(f"Error fetching triggers: {e}")
+
+    # 3. Logout
+    logout_payload = {
         "jsonrpc": "2.0",
         "method": "user.logout",
         "params": {},
-        "id": 3,  # Alterei o ID aqui para evitar duplicidade com o login
-        "auth": AUTHTOKEN
-    })
+        "id": 3,
+        "auth": auth_token
+    }
+    
+    try:
+        response = session.post(zabbix_api_url, json=logout_payload, headers=headers)
+        logout_data = response.json()
+        if "result" in logout_data:
+            logging.info("Logout successful!")
+        else:
+            logging.warning(f"Logout failed: {logout_data}")
+    except requests.RequestException as e:
+        logging.warning(f"Error during logout: {e}")
 
-    # Verificando se o logout foi bem-sucedido
-    logout_response = req.json()
-    if "result" in logout_response:
-        print("Logout bem-sucedido!")
-        print(datetime.now())
-    else:
-        print("\nErro ao fazer logout:", logout_response)
-
+    return triggers
